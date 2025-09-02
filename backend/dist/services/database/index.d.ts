@@ -1,0 +1,20 @@
+export { BaseService } from './base.js';
+export { ProfileService } from './profiles.js';
+export { PetService } from './pets.js';
+export { FoodProductService } from './food-products.js';
+export { ScanHistoryService } from './scan-history.js';
+export { ChatService } from './chat.js';
+export { ComparisonService } from './comparisons.js';
+import { ProfileService } from './profiles.js';
+import { PetService } from './pets.js';
+import { FoodProductService } from './food-products.js';
+import { ScanHistoryService } from './scan-history.js';
+import { ChatService } from './chat.js';
+import { ComparisonService } from './comparisons.js';
+export declare const profileService: ProfileService;
+export declare const petService: PetService;
+export declare const foodProductService: FoodProductService;
+export declare const scanHistoryService: ScanHistoryService;
+export declare const chatService: ChatService;
+export declare const comparisonService: ComparisonService;
+//# sourceMappingURL=index.d.ts.map
