@@ -120,7 +120,7 @@ export const Pets: React.FC = () => {
                 <div className="flex items-center space-x-4 space-x-reverse">
                   <div className="relative">
                     <Avatar className="w-16 h-16">
-                      <AvatarImage src={pet.avatarUrl} alt={pet.name} />
+                      <AvatarImage src={pet.avatar_url} alt={pet.name} />
                       <AvatarFallback className="text-lg">
                         {pet.name.charAt(0)}
                       </AvatarFallback>
@@ -167,23 +167,23 @@ export const Pets: React.FC = () => {
                       <Badge variant="outline">
                         {pet.weight} کیلوگرم
                       </Badge>
-                      <Badge className={getActivityLevelColor(pet.activityLevel)}>
-                        فعالیت {getActivityLevelText(pet.activityLevel)}
+                      <Badge className={getActivityLevelColor(pet.activity_level)}>
+                        فعالیت {getActivityLevelText(pet.activity_level)}
                       </Badge>
                     </div>
                     
-                    {pet.healthConditions && pet.healthConditions.length > 0 && (
+                    {pet.health_conditions && pet.health_conditions.length > 0 && (
                       <div className="flex items-center space-x-2 space-x-reverse">
                         <Heart className="w-4 h-4 text-red-500" />
                         <span className="text-sm text-gray-600">
-                          {pet.healthConditions.join('، ')}
+                          {pet.health_conditions.join('، ')}
                         </span>
                       </div>
                     )}
                     
-                    {pet.dietaryRestrictions && pet.dietaryRestrictions.length > 0 && (
+                    {pet.dietary_restrictions && pet.dietary_restrictions.length > 0 && (
                       <div className="text-xs text-gray-500">
-                        محدودیت غذایی: {pet.dietaryRestrictions.join('، ')}
+                        محدودیت غذایی: {pet.dietary_restrictions.join('، ')}
                       </div>
                     )}
                   </div>

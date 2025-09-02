@@ -6,11 +6,10 @@ export interface Pet {
   age: number;
   weight: number;
   gender: 'male' | 'female';
-  healthConditions?: string[];
-  allergies?: string[];
-  dietaryRestrictions?: string[];
-  activityLevel: 'low' | 'moderate' | 'high';
-  avatarUrl?: string;
+  health_conditions?: string[];
+  dietary_restrictions?: string[];
+  activity_level: 'low' | 'moderate' | 'high';
+  avatar_url?: string;
 }
 
 export interface User {

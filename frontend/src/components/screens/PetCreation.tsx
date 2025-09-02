@@ -21,37 +21,41 @@ export const PetCreation: React.FC = () => {
     age: '',
     weight: '',
     gender: '' as 'male' | 'female',
-    activityLevel: '' as 'low' | 'moderate' | 'high',
-    healthConditions: [] as string[],
-    allergies: [] as string[]
+    activity_level: '' as 'low' | 'moderate' | 'high',
+    health_conditions: [] as string[],
+    dietary_restrictions: [] as string[]
   });
 
   const [customHealthCondition, setCustomHealthCondition] = useState('');
   const [customAllergy, setCustomAllergy] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.species) return;
     
-    const newPet: Pet = {
-      id: Date.now().toString(),
-      name: formData.name,
-      species: formData.species,
-      breed: formData.breed || 'مخلوط',
-      age: parseInt(formData.age) || 1,
-      weight: parseFloat(formData.weight) || 1,
-      gender: formData.gender || 'male',
-      activityLevel: formData.activityLevel || 'moderate',
-      healthConditions: formData.healthConditions,
-      allergies: formData.allergies,
-      avatarUrl: formData.species === 'cat' 
-        ? mockPets[0].avatarUrl 
-        : mockPets[1].avatarUrl
-    };
-    
-    addPet(newPet);
-    setCurrentScreen('home');
+    try {
+      const petData = {
+        name: formData.name,
+        species: formData.species,
+        breed: formData.breed || 'مخلوط',
+        age: parseInt(formData.age) || 1,
+        weight: parseFloat(formData.weight) || 1,
+        gender: formData.gender || 'male',
+        activity_level: formData.activity_level || 'moderate',
+        health_conditions: formData.health_conditions,
+        dietary_restrictions: formData.dietary_restrictions,
+        avatar_url: formData.species === 'cat' 
+          ? 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400&h=400&fit=crop&crop=face'
+          : 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=400&h=400&fit=crop&crop=face'
+      };
+      
+      await addPet(petData);
+      setCurrentScreen('home');
+    } catch (error) {
+      console.error('Failed to create pet:', error);
+      // Error is handled by AppContext
+    }
   };
 
   const handleBack = () => {
@@ -62,47 +66,47 @@ export const PetCreation: React.FC = () => {
     if (checked) {
       setFormData({
         ...formData,
-        healthConditions: [...formData.healthConditions, condition]
+        health_conditions: [...formData.health_conditions, condition]
       });
     } else {
       setFormData({
         ...formData,
-        healthConditions: formData.healthConditions.filter(h => h !== condition),
-        // Remove allergies if "آلرژی" is unchecked
-        allergies: condition === 'آلرژی' ? [] : formData.allergies
+        health_conditions: formData.health_conditions.filter(h => h !== condition),
+        // Remove dietary restrictions if "آلرژی" is unchecked
+        dietary_restrictions: condition === 'آلرژی' ? [] : formData.dietary_restrictions
       });
     }
   };
 
   const handleAddCustomHealthCondition = () => {
-    if (customHealthCondition.trim() && !formData.healthConditions.includes(customHealthCondition.trim())) {
+    if (customHealthCondition.trim() && !formData.health_conditions.includes(customHealthCondition.trim())) {
       setFormData({
         ...formData,
-        healthConditions: [...formData.healthConditions, customHealthCondition.trim()]
+        health_conditions: [...formData.health_conditions, customHealthCondition.trim()]
       });
       setCustomHealthCondition('');
     }
   };
 
-  const handleAllergyChange = (allergy: string, checked: boolean) => {
+  const handleDietaryRestrictionChange = (restriction: string, checked: boolean) => {
     if (checked) {
       setFormData({
         ...formData,
-        allergies: [...formData.allergies, allergy]
+        dietary_restrictions: [...formData.dietary_restrictions, restriction]
       });
     } else {
       setFormData({
         ...formData,
-        allergies: formData.allergies.filter(a => a !== allergy)
+        dietary_restrictions: formData.dietary_restrictions.filter(a => a !== restriction)
       });
     }
   };
 
   const handleAddCustomAllergy = () => {
-    if (customAllergy.trim() && !formData.allergies.includes(customAllergy.trim())) {
+    if (customAllergy.trim() && !formData.dietary_restrictions.includes(customAllergy.trim())) {
       setFormData({
         ...formData,
-        allergies: [...formData.allergies, customAllergy.trim()]
+        dietary_restrictions: [...formData.dietary_restrictions, customAllergy.trim()]
       });
       setCustomAllergy('');
     }
@@ -111,20 +115,20 @@ export const PetCreation: React.FC = () => {
   const removeHealthCondition = (condition: string) => {
     setFormData({
       ...formData,
-      healthConditions: formData.healthConditions.filter(h => h !== condition),
-      // Remove allergies if "آلرژی" is removed
-      allergies: condition === 'آلرژی' ? [] : formData.allergies
+      health_conditions: formData.health_conditions.filter(h => h !== condition),
+      // Also remove dietary restrictions if removing "آلرژی"
+      dietary_restrictions: condition === 'آلرژی' ? [] : formData.dietary_restrictions
     });
   };
 
-  const removeAllergy = (allergy: string) => {
+  const removeDietaryRestriction = (restriction: string) => {
     setFormData({
       ...formData,
-      allergies: formData.allergies.filter(a => a !== allergy)
+      dietary_restrictions: formData.dietary_restrictions.filter(a => a !== restriction)
     });
   };
 
-  const isAllergySelected = formData.healthConditions.includes('آلرژی');
+  const isAllergySelected = formData.health_conditions.includes('آلرژی');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white p-6">
@@ -231,7 +235,7 @@ export const PetCreation: React.FC = () => {
 
               <div>
                 <Label htmlFor="activity">{persian.activityLevel}</Label>
-                <Select onValueChange={(value: 'low' | 'moderate' | 'high') => setFormData({...formData, activityLevel: value})}>
+                <Select onValueChange={(value: 'low' | 'moderate' | 'high') => setFormData({...formData, activity_level: value})}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="سطح فعالیت" />
                   </SelectTrigger>
@@ -247,10 +251,10 @@ export const PetCreation: React.FC = () => {
                 <Label>{persian.healthConditions}</Label>
                 <div className="mt-2 space-y-2">
                   {/* Selected health conditions */}
-                  {formData.healthConditions.length > 0 && (
+                  {formData.health_conditions.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-4 p-3 bg-orange-50 rounded-xl border border-orange-100">
                       <p className="w-full text-xs font-medium text-orange-700 mb-1">وضعیت‌های انتخاب شده:</p>
-                      {formData.healthConditions.map((condition) => (
+                      {formData.health_conditions.map((condition) => (
                         <div
                           key={condition}
                           className="flex items-center gap-2 bg-[#F59E0B] text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm"
@@ -275,10 +279,10 @@ export const PetCreation: React.FC = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setFormData({...formData, healthConditions: [], allergies: []});
+                        setFormData({...formData, health_conditions: [], dietary_restrictions: []});
                       }}
                       className={`${
-                        formData.healthConditions.length === 0
+                        formData.health_conditions.length === 0
                           ? 'bg-[#F59E0B] border-[#F59E0B] text-white hover:bg-[#D97706] hover:border-[#D97706] shadow-md'
                           : 'bg-white border-gray-200 text-gray-700 hover:bg-orange-50 hover:border-orange-200'
                       } transition-all duration-200 rounded-xl py-3 px-4 text-sm font-medium min-h-[44px] flex items-center justify-center`}
@@ -291,9 +295,9 @@ export const PetCreation: React.FC = () => {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => handleHealthConditionChange(condition, !formData.healthConditions.includes(condition))}
+                        onClick={() => handleHealthConditionChange(condition, !formData.health_conditions.includes(condition))}
                         className={`${
-                          formData.healthConditions.includes(condition)
+                          formData.health_conditions.includes(condition)
                             ? 'bg-[#F59E0B] border-[#F59E0B] text-white hover:bg-[#D97706] hover:border-[#D97706] shadow-md transform scale-[1.02]'
                             : 'bg-white border-gray-200 text-gray-700 hover:bg-orange-50 hover:border-orange-200 hover:shadow-sm'
                         } transition-all duration-200 rounded-xl py-3 px-4 text-sm font-medium min-h-[44px] flex items-center justify-center`}
@@ -336,10 +340,10 @@ export const PetCreation: React.FC = () => {
                   <Label>{persian.allergies}</Label>
                   <div className="mt-2 space-y-2">
                     {/* Selected allergies */}
-                    {formData.allergies.length > 0 && (
+                    {formData.dietary_restrictions.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-4 p-3 bg-red-50 rounded-xl border border-red-100">
                         <p className="w-full text-xs font-medium text-red-700 mb-1">آلرژی‌های انتخاب شده:</p>
-                        {formData.allergies.map((allergy) => (
+                        {formData.dietary_restrictions.map((allergy) => (
                           <div
                             key={allergy}
                             className="flex items-center gap-2 bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm"
@@ -347,7 +351,7 @@ export const PetCreation: React.FC = () => {
                             <span>{allergy}</span>
                             <button
                               type="button"
-                              onClick={() => removeAllergy(allergy)}
+                              onClick={() => removeDietaryRestriction(allergy)}
                               className="hover:bg-red-600 rounded-full p-1 transition-colors duration-150"
                             >
                               <X className="w-3 h-3" />
@@ -365,9 +369,9 @@ export const PetCreation: React.FC = () => {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => handleAllergyChange(allergy, !formData.allergies.includes(allergy))}
+                          onClick={() => handleDietaryRestrictionChange(allergy, !formData.dietary_restrictions.includes(allergy))}
                           className={`${
-                            formData.allergies.includes(allergy)
+                            formData.dietary_restrictions.includes(allergy)
                               ? 'bg-red-500 border-red-500 text-white hover:bg-red-600 hover:border-red-600 shadow-md transform scale-[1.02]'
                               : 'bg-white border-gray-200 text-gray-700 hover:bg-red-50 hover:border-red-200 hover:shadow-sm'
                           } transition-all duration-200 rounded-xl py-3 px-4 text-sm font-medium min-h-[44px] flex items-center justify-center`}
