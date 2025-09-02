@@ -40,16 +40,19 @@ export function getGeminiModel(modelConfig: Partial<GeminiConfig> = {}) {
     maxOutputTokens: finalConfig.max_output_tokens
   }
 
-  // Add tools if specified
-  if (finalConfig.tools) {
-    generativeConfig.tools = finalConfig.tools
-  }
-
-  return genAI.getGenerativeModel({
+  // Prepare model configuration
+  const modelConfigObj: any = {
     model: finalConfig.model,
     generationConfig: generativeConfig,
     safetySettings: finalConfig.safety_settings
-  })
+  }
+
+  // Add tools at root level if specified
+  if (finalConfig.tools) {
+    modelConfigObj.tools = finalConfig.tools
+  }
+
+  return genAI.getGenerativeModel(modelConfigObj)
 }
 
 // Get model with Google Search tool
@@ -81,9 +84,18 @@ export async function generateStructuredOutput<T>(
   schema: GeminiStructuredSchema,
   modelConfig: Partial<GeminiConfig> = {}
 ): Promise<T> {
-  const model = getGeminiModel(modelConfig)
+  const maxRetries = 3
+  let lastError: Error | null = null
   
-  const structuredPrompt = `
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const model = getGeminiModel({
+        ...modelConfig,
+        max_output_tokens: Math.max(modelConfig.max_output_tokens || 8192, 8192), // Ensure sufficient tokens
+        temperature: Math.min(modelConfig.temperature || 0.1, 0.1) // Lower temperature for more consistent output
+      })
+      
+      const structuredPrompt = `
 ${prompt}
 
 Please respond with a JSON object that strictly follows this schema:
@@ -94,27 +106,169 @@ Important:
 - Include all required fields
 - Follow exact property names and types
 - Do not include any explanation outside the JSON
+- Use Persian (Farsi) text for ingredient names and descriptions
+- Ensure the response is complete and not truncated
 `
 
-  try {
-    const result = await model.generateContent(structuredPrompt)
-    const response = await result.response
-    const text = response.text()
+      console.log(`Attempt ${attempt}/${maxRetries} - Sending prompt to Gemini:`, structuredPrompt)
+      
+      // Add timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Gemini API request timeout')), 30000) // 30 second timeout
+      })
+      
+      const generatePromise = model.generateContent(structuredPrompt)
+      const result = await Promise.race([generatePromise, timeoutPromise]) as any
+      const response = await result.response
+      const text = response.text()
+      
+      console.log(`Attempt ${attempt} - Raw Gemini response:`, text)
     
-    // Clean and parse JSON response
-    const cleanedText = text.replace(/```json\n?|\n?```/g, '').trim()
+    // Enhanced JSON cleaning and extraction
+    let cleanedText = text.trim()
+    
+    // Remove markdown code blocks
+    cleanedText = cleanedText.replace(/```json\s*|\s*```/g, '')
+    
+    // Remove any leading/trailing non-JSON content
+    const jsonStart = cleanedText.indexOf('{')
+    const jsonEnd = cleanedText.lastIndexOf('}') + 1
+    
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      cleanedText = cleanedText.substring(jsonStart, jsonEnd)
+    }
+    
+    // Additional cleanup for common issues
+    cleanedText = cleanedText
+      .replace(/\n\s*\n/g, '\n') // Remove extra newlines
+      .replace(/,\s*}/g, '}')   // Remove trailing commas
+      .replace(/,\s*]/g, ']')   // Remove trailing commas in arrays
+      .trim()
+    
+    console.log('Cleaned JSON text:', cleanedText)
+    
+    if (!cleanedText || cleanedText.length === 0) {
+      throw new Error('Empty response from Gemini API')
+    }
     
     try {
-      return JSON.parse(cleanedText) as T
+      const parsed = JSON.parse(cleanedText)
+      console.log('Successfully parsed JSON:', parsed)
+      return parsed as T
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError)
-      console.error('Response text:', cleanedText)
-      throw new Error(`Failed to parse AI response as JSON: ${parseError}`)
+      console.error(`Attempt ${attempt} - JSON Parse Error:`, parseError)
+      console.error('Original response:', text)
+      console.error('Cleaned text:', cleanedText)
+      
+      lastError = parseError instanceof Error ? parseError : new Error(String(parseError))
+      
+      if (attempt === maxRetries) {
+        // Try to extract partial JSON if possible on final attempt
+        try {
+          // Attempt to fix common JSON issues
+          let fixedText = cleanedText
+          
+          // Handle unterminated strings by finding the last complete quote
+          if (fixedText.includes('"') && !fixedText.endsWith('"')) {
+            const lastQuoteIndex = fixedText.lastIndexOf('"')
+            if (lastQuoteIndex > 0) {
+              // Check if this quote is properly closed
+              const afterQuote = fixedText.substring(lastQuoteIndex + 1)
+              if (!afterQuote.match(/^[^"]*"/) && !afterQuote.match(/^[^"]*[,}\]]/)) {
+                // Truncate at the last complete quote and add closing quote
+                fixedText = fixedText.substring(0, lastQuoteIndex + 1)
+              }
+            }
+          }
+          
+          // Handle incomplete arrays by removing trailing incomplete elements
+          if (fixedText.includes('[') && !fixedText.includes(']')) {
+            const lastCommaIndex = fixedText.lastIndexOf(',')
+            if (lastCommaIndex > 0) {
+              fixedText = fixedText.substring(0, lastCommaIndex)
+            }
+          }
+          
+          // Remove trailing incomplete elements after commas
+          fixedText = fixedText.replace(/,\s*[^,{}\[\]"]*$/, '')
+          
+          // Add missing closing brackets and braces
+          const openBraces = (fixedText.match(/{/g) || []).length
+          const closeBraces = (fixedText.match(/}/g) || []).length
+          const openBrackets = (fixedText.match(/\[/g) || []).length
+          const closeBrackets = (fixedText.match(/\]/g) || []).length
+          
+          if (openBrackets > closeBrackets) {
+            fixedText += ']'.repeat(openBrackets - closeBrackets)
+          }
+          
+          if (openBraces > closeBraces) {
+            fixedText += '}'.repeat(openBraces - closeBraces)
+          }
+          
+          console.log('Attempting to fix JSON:', fixedText)
+          const fixedParsed = JSON.parse(fixedText)
+          console.log('Fixed and parsed JSON:', fixedParsed)
+          return fixedParsed as T
+        } catch (fixError) {
+          console.error('Failed to fix JSON:', fixError)
+          
+          // Last resort: try to extract any valid JSON object from the response
+          try {
+            const jsonMatch = text.match(/{[\s\S]*}/)
+            if (jsonMatch) {
+              let extractedJson = jsonMatch[0]
+              
+              // Basic cleanup for extracted JSON
+              extractedJson = extractedJson
+                .replace(/,\s*}/g, '}')
+                .replace(/,\s*]/g, ']')
+                .replace(/"[^"]*$/, '""') // Close unterminated strings
+              
+              // Try to balance braces and brackets
+              const openBraces = (extractedJson.match(/{/g) || []).length
+              const closeBraces = (extractedJson.match(/}/g) || []).length
+              const openBrackets = (extractedJson.match(/\[/g) || []).length
+              const closeBrackets = (extractedJson.match(/\]/g) || []).length
+              
+              if (openBrackets > closeBrackets) {
+                extractedJson += ']'.repeat(openBrackets - closeBrackets)
+              }
+              if (openBraces > closeBrackets) {
+                extractedJson += '}'.repeat(openBraces - closeBraces)
+              }
+              
+              console.log('Attempting last resort JSON extraction:', extractedJson)
+              const lastResortParsed = JSON.parse(extractedJson)
+              console.log('Last resort parsing successful:', lastResortParsed)
+              return lastResortParsed as T
+            }
+          } catch (lastResortError) {
+            console.error('Last resort JSON extraction failed:', lastResortError)
+          }
+          
+          const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
+          throw new Error(`Failed to parse AI response as JSON after ${maxRetries} attempts: ${errorMessage}. Original text: ${text.substring(0, 500)}...`)
+        }
+      } else {
+        console.log(`Attempt ${attempt} failed, retrying...`)
+        continue
+      }
     }
-  } catch (error) {
-    console.error('Gemini API Error:', error)
-    throw new Error(`Gemini API call failed: ${error}`)
+    } catch (error) {
+      console.error(`Attempt ${attempt} - Gemini API Error:`, error)
+      lastError = error instanceof Error ? error : new Error(String(error))
+      
+      if (attempt === maxRetries) {
+        throw new Error(`Gemini API call failed after ${maxRetries} attempts: ${lastError.message}`)
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+    }
   }
+  
+  throw new Error(`All ${maxRetries} attempts failed. Last error: ${lastError?.message || 'Unknown error'}`)
 }
 
 // Generate vision analysis
